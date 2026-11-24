@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -320,6 +321,72 @@
       background: var(--espresso);
     }
 
+    .shots-selector-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--espresso);
+      margin-bottom: 8px;
+    }
+
+    .shots-selector-header span {
+      color: var(--mocha);
+      font-weight: 600;
+    }
+
+    .shots-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .shot-option-btn {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--border-soft);
+      background: #FFFFFF;
+      color: var(--text-dark);
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-align: left;
+    }
+
+    .shot-option-btn.selected {
+      background: #EFE3D6;
+      border-color: var(--mocha);
+      color: var(--espresso);
+    }
+
+    .shot-option-sign {
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      border: 1px solid var(--mocha-light);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--mocha);
+      background: #FAF6F0;
+      flex-shrink: 0;
+    }
+
+    .shot-option-btn.selected .shot-option-sign {
+      background: var(--mocha);
+      border-color: var(--mocha);
+      color: #FFFFFF;
+    }
+
     .cart-bar {
       position: fixed;
       bottom: 0;
@@ -447,7 +514,7 @@
   <header>
     <div class="brand-badge">Pastelería Artesanal</div>
     <h1>Lo de Roxana</h1>
-    <p>Tortas, minis, alfajorcitos, scones, cookies y boxes preparados con dedicación. Pedidos con mínimo 24 hs de anticipación.</p>
+    <p>Tortas, minis, alfajorcitos, scones, cookies, shots y boxes preparados con dedicación. Pedidos con mínimo 24 hs de anticipación.</p>
   </header>
 
   <nav class="cat-nav" id="catNav"></nav>
@@ -509,6 +576,29 @@
     const WHATSAPP_NUMBER = "5491155040475";
 
     const MENU = [
+      {
+        category: "Shots",
+        items: [
+          {
+            id: "shots-x12",
+            name: "Shots x12",
+            price: 40000,
+            isNew: true,
+            desc: "Caja de 12 shots (4 variedades × 3 unidades). Elegí 4 sabores para armar tu caja.",
+            img: "img/shots-x12.jpg",
+            selectCount: 4,
+            unitMultiplierLabel: "x3",
+            flavors: [
+              "Tiramisú",
+              "Cheesecake",
+              "Oreo",
+              "Key Lime Pie",
+              "Chocotorta",
+              "Brownie"
+            ]
+          }
+        ]
+      },
       {
         category: "Tortas y Tartas",
         items: [
@@ -593,6 +683,7 @@
 
     let cart = [];
     let selectedShift = "Turno Mañana (11 a 13 hs)";
+    const selectedFlavorsByItem = {};
 
     function formatARS(num) {
       return "$" + Number(num || 0).toLocaleString("es-AR");
@@ -634,6 +725,56 @@
       });
     });
 
+    function toggleFlavor(itemId, flavorName) {
+      const item = findItemById(itemId);
+      if (!item || !Array.isArray(item.flavors)) return;
+      const maxCount = item.selectCount || 4;
+      if (!selectedFlavorsByItem[itemId]) selectedFlavorsByItem[itemId] = [];
+
+      const current = selectedFlavorsByItem[itemId];
+      const idx = current.indexOf(flavorName);
+
+      if (idx !== -1) {
+        current.splice(idx, 1);
+      } else {
+        if (current.length >= maxCount) {
+          alert(`Podés seleccionar hasta ${maxCount} variedades para esta caja.`);
+          return;
+        }
+        current.push(flavorName);
+      }
+
+      renderFlavorSelector(item);
+    }
+
+    function renderFlavorSelector(item) {
+      const maxCount = item.selectCount || 4;
+      const mult = item.unitMultiplierLabel || "x3";
+      const chosen = selectedFlavorsByItem[item.id] || [];
+      const counterEl = document.getElementById(`flavor-counter-${item.id}`);
+      const listEl = document.getElementById(`flavor-list-${item.id}`);
+
+      if (counterEl) {
+        counterEl.textContent = `${chosen.length}/${maxCount} elegidos`;
+      }
+
+      if (listEl) {
+        listEl.innerHTML = item.flavors.map((flavor) => {
+          const isSelected = chosen.includes(flavor);
+          return `
+            <button
+              type="button"
+              class="shot-option-btn ${isSelected ? "selected" : ""}"
+              onclick="toggleFlavor('${item.id}', '${flavor.replace(/'/g, "\\'")}')"
+            >
+              <span>${flavor} ${mult}</span>
+              <span class="shot-option-sign">${isSelected ? "✓" : "+"}</span>
+            </button>
+          `;
+        }).join("");
+      }
+    }
+
     function renderMenu() {
       const nav = document.getElementById("catNav");
       const container = document.getElementById("menuSections");
@@ -664,6 +805,7 @@
         const grid = sectionEl.querySelector(`#grid-${idx}`);
         sec.items.forEach((item) => {
           const hasVariants = Array.isArray(item.variants);
+          const hasFlavors = Array.isArray(item.flavors);
           const initialPrice = hasVariants ? item.variants[0].price : item.price;
           const priceText = hasVariants
             ? formatARS(initialPrice)
@@ -688,11 +830,22 @@
                     ${item.variants.map((v, i) => `<option value="${i}">${v.label}</option>`).join("")}
                   </select>
                 ` : ""}
+                ${hasFlavors ? `
+                  <div class="shots-selector-header">
+                    <div>Variedades <span style="font-weight:500;">(Selecciona ${item.selectCount || 4})</span></div>
+                    <span id="flavor-counter-${item.id}">0/${item.selectCount || 4} elegidos</span>
+                  </div>
+                  <div class="shots-list" id="flavor-list-${item.id}"></div>
+                ` : ""}
                 <button class="add-btn" onclick="addItem('${item.id}')">Agregar al pedido</button>
               </div>
             </div>
           `;
           grid.appendChild(card);
+
+          if (hasFlavors) {
+            renderFlavorSelector(item);
+          }
         });
       });
     }
@@ -726,6 +879,17 @@
         key = `${item.id}-${variant.value}`;
         displayName = `${item.name} (${variant.value})`;
         unitPrice = variant.price;
+      } else if (Array.isArray(item.flavors)) {
+        const requiredCount = item.selectCount || 4;
+        const mult = item.unitMultiplierLabel || "x3";
+        const chosen = selectedFlavorsByItem[id] || [];
+        if (chosen.length !== requiredCount) {
+          alert(`Por favor seleccioná ${requiredCount} variedades (${mult} de cada una) para tu ${item.name}.`);
+          return;
+        }
+        const sortedFlavors = [...chosen].sort();
+        key = `${item.id}-${sortedFlavors.join("|")}`;
+        displayName = `${item.name}: ${chosen.map((f) => `${f} ${mult}`).join(", ")}`;
       }
 
       const existing = cart.find((c) => c.key === key);
